@@ -113,6 +113,10 @@ h1 {
   box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
 }
 
+:deep(.el-collapse) {
+  border: none;
+}
+
 :deep(.el-collapse-item__header) {
   font-size: 16px;
   font-weight: bold;
@@ -121,6 +125,11 @@ h1 {
   padding-left: 15px;
   border-radius: 4px;
   margin-bottom: 5px;
+  border: none;
+}
+
+:deep(.el-collapse-item__wrap) {
+  border: none;
 }
 
 :deep(.el-collapse-item__content) {
