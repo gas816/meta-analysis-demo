@@ -34,20 +34,35 @@ export interface GradeProfile {
   importance: string; // 'Critical' | 'Important' | 'Not important'
   numberOfStudies: number;
   sampleSize: number;
-  
+
   // 降级因素
-  riskOfBias: { rating: 'not-serious' | 'serious' | 'very-serious'; reason: string };
-  inconsistency: { rating: 'not-serious' | 'serious' | 'very-serious'; reason: string };
-  indirectness: { rating: 'not-serious' | 'serious' | 'very-serious'; reason: string };
-  imprecision: { rating: 'not-serious' | 'serious' | 'very-serious'; reason: string };
-  publicationBias: { rating: 'undetected' | 'suspected' | 'strongly-suspected'; reason: string };
-  
+  riskOfBias: {
+    rating: "not-serious" | "serious" | "very-serious";
+    reason: string;
+  };
+  inconsistency: {
+    rating: "not-serious" | "serious" | "very-serious";
+    reason: string;
+  };
+  indirectness: {
+    rating: "not-serious" | "serious" | "very-serious";
+    reason: string;
+  };
+  imprecision: {
+    rating: "not-serious" | "serious" | "very-serious";
+    reason: string;
+  };
+  publicationBias: {
+    rating: "undetected" | "suspected" | "strongly-suspected";
+    reason: string;
+  };
+
   // 升级因素
   largeEffect: boolean;
   doseResponse: boolean;
   confounding: boolean;
 
-  overallCertainty: 'High' | 'Moderate' | 'Low' | 'Very Low';
+  overallCertainty: "High" | "Moderate" | "Low" | "Very Low";
   resultSummary: string;
 }
 
@@ -431,7 +446,213 @@ export const useMetaStore = defineStore("meta", () => {
 异质性检验显示 $I^2 = ${analysis.heterogeneity.i2}%$。
 
 ## 4. 结论
-根据 GRADE 评级，主要结局指标的证据质量为 **${grade.profiles[0]?.overallCertainty || '未评估'}**。
+根据 GRADE 评级，主要结局指标的证据质量为 **${
+      grade.profiles[0]?.overallCertainty || "未评估"
+    }**。
+    `;
+  };
+
+  const fillXuExampleData = async () => {
+    // 1. PICO
+    pico.population = "一般人群 (General population)";
+    pico.intervention = "睡眠问题 (Sleep problems)";
+    pico.comparison = "正常睡眠 (Normal sleep)";
+    pico.outcome = "认知障碍或痴呆风险 (Risk of cognitive decline or dementia)";
+    pico.question = "睡眠问题与认知障碍风险的关联";
+
+    // 2. Search Strategy
+    search.databases = ["PubMed", "EMBASE"];
+    search.dateRange = ["1980-01", "2019-02"];
+    search.terms = [
+      { id: 1, logic: "AND", term: "dementia OR cognitive" },
+      { id: 2, logic: "AND", term: "sleep OR insomnia" },
+    ];
+    search.searchString =
+      '(dementia OR cognitive) AND (sleep OR insomnia) AND ("1980-01" : "2019-02") [Date - Publication]';
+
+    // 3. Criteria
+    criteria.inclusion = [
+      "纵向研究 (Longitudinal studies)",
+      "探讨睡眠指标与痴呆或认知下降的关联",
+      "报告多变量校正的风险比/OR等数据",
+    ];
+    criteria.exclusion = [
+      "未提供效应值",
+      "横断面研究 (Cross-sectional studies)",
+      "仅有摘要无全文",
+    ];
+
+    // 4. Literature (Mock Data based on Xu et al. context)
+    literatures.value = [
+      {
+        id: 101,
+        title:
+          "Sleep duration and cognitive decline in the elderly: A 10-year cohort study",
+        authors: "Anderson et al.",
+        year: "2018",
+        journal: "Sleep Med",
+        status: "included",
+        selected: true,
+      },
+      {
+        id: 102,
+        title:
+          "Insomnia and risk of dementia: a prospective population-based study",
+        authors: "Baker et al.",
+        year: "2017",
+        journal: "J Gerontol",
+        status: "included",
+        selected: true,
+      },
+      {
+        id: 103,
+        title:
+          "Sleep disturbance and Alzheimer's disease: A longitudinal analysis",
+        authors: "Chen et al.",
+        year: "2016",
+        journal: "Neurology",
+        status: "included",
+        selected: true,
+      },
+      {
+        id: 104,
+        title: "Prevalence of insomnia in patients with dementia",
+        authors: "Davis et al.",
+        year: "2015",
+        journal: "J Psych",
+        status: "excluded",
+        exclusionPhase: "eligibility",
+        reason: "横断面研究 (Cross-sectional)",
+        selected: false,
+      },
+      {
+        id: 105,
+        title: "Effect of sleep medication on memory consolidation",
+        authors: "Evans et al.",
+        year: "2019",
+        journal: "Pharmacol",
+        status: "excluded",
+        exclusionPhase: "screening",
+        reason: "干预措施不符 (Intervention mismatch)",
+        selected: false,
+      },
+    ];
+
+    // 5. Data Extraction
+    extractionHeaders.value = [
+      { prop: "studyId", label: "Study ID", width: "80", type: "text" },
+      { prop: "author", label: "Author", width: "100", type: "text" },
+      { prop: "year", label: "Year", width: "70", type: "number" },
+      { prop: "design", label: "Design", width: "100", type: "text" },
+      { prop: "n", label: "N", width: "80", type: "number" },
+      { prop: "exposure", label: "Exposure", width: "120", type: "text" },
+      { prop: "outcome", label: "Outcome", width: "120", type: "text" },
+      { prop: "es", label: "RR", width: "80", type: "number" },
+      { prop: "lower", label: "95% CI L", width: "80", type: "number" },
+      { prop: "upper", label: "95% CI U", width: "80", type: "number" },
+    ];
+
+    extractionData.value = [
+      {
+        id: 1,
+        studyId: "S001",
+        author: "Anderson",
+        year: 2018,
+        design: "Cohort",
+        n: 1500,
+        exposure: "Short Sleep",
+        outcome: "Cognitive Decline",
+        es: 1.35,
+        lower: 1.1,
+        upper: 1.65,
+      },
+      {
+        id: 2,
+        studyId: "S002",
+        author: "Baker",
+        year: 2017,
+        design: "Cohort",
+        n: 2300,
+        exposure: "Insomnia",
+        outcome: "Dementia",
+        es: 1.27,
+        lower: 1.12,
+        upper: 1.45,
+      },
+      {
+        id: 3,
+        studyId: "S003",
+        author: "Chen",
+        year: 2016,
+        design: "Cohort",
+        n: 1800,
+        exposure: "Sleep Disturbance",
+        outcome: "AD",
+        es: 1.19,
+        lower: 1.05,
+        upper: 1.35,
+      },
+    ];
+
+    // 6. Analysis
+    analysis.effectModel = "RR";
+    analysis.heterogeneity = { i2: 27.5, q: 4.5, p: 0.12 }; // Low heterogeneity
+    analysis.isAnalyzed = true;
+
+    // 7. GRADE
+    grade.tool = "NOS";
+    grade.profiles = [
+      {
+        id: "g1",
+        outcomeName: "Cognitive Impairment / Dementia",
+        importance: "Critical",
+        numberOfStudies: 3,
+        sampleSize: 5600,
+        riskOfBias: {
+          rating: "not-serious",
+          reason: "Most studies had high NOS scores",
+        },
+        inconsistency: { rating: "not-serious", reason: "I2 < 30%" },
+        indirectness: {
+          rating: "not-serious",
+          reason: "Directly addressed PICO",
+        },
+        imprecision: { rating: "not-serious", reason: "Narrow CIs" },
+        publicationBias: {
+          rating: "undetected",
+          reason: "Funnel plot symmetric",
+        },
+        largeEffect: false,
+        doseResponse: true,
+        confounding: false,
+        overallCertainty: "High",
+        resultSummary:
+          "睡眠问题显著增加认知障碍风险 (RR=1.27, 95%CI 1.16–1.39)。",
+      },
+    ];
+
+    // 8. Report
+    reportContent.value = `
+# Meta分析报告：睡眠问题与认知障碍风险
+
+## 1. 背景 (Introduction)
+本研究旨在系统评价睡眠问题（如失眠、睡眠时长异常）与认知障碍或痴呆风险之间的关联。
+
+## 2. 方法 (Methods)
+我们检索了 PubMed 和 EMBASE 数据库，截止日期为 2019年2月。
+**纳入标准**：纵向研究；探讨睡眠指标与痴呆关联；提供多变量校正效应量。
+**排除标准**：横断面研究；无全文；未报告效应值。
+质量评估采用 Newcastle-Ottawa Scale (NOS)。
+
+## 3. 结果 (Results)
+共纳入 3 项代表性队列研究（实际Xu研究纳入更多），总样本量 5600 人。
+**主要发现**：
+- 失眠显著增加全因认知障碍风险 (RR=1.27, 95%CI 1.16–1.39)。
+- 异质性较低 ($I^2 = 27.5\%$)。
+- 剂量-反应分析显示睡眠时长与痴呆风险呈U型关系。
+
+## 4. 结论 (Conclusion)
+基于 **High** 质量证据，睡眠问题是认知障碍和痴呆的重要风险因素。建议关注睡眠健康以预防认知下降。
     `;
   };
 
@@ -455,5 +676,6 @@ export const useMetaStore = defineStore("meta", () => {
     removeExtractionHeader,
     runMetaAnalysis,
     generateReport,
+    fillXuExampleData,
   };
 });

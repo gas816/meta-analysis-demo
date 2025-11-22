@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import { useMetaStore } from "./stores/metaStore";
 import PicoDefinition from "./components/PicoDefinition.vue";
 import SearchStrategy from "./components/SearchStrategy.vue";
 import InclusionExclusion from "./components/InclusionExclusion.vue";
@@ -10,6 +11,13 @@ import GradeEvaluation from "./components/GradeEvaluation.vue";
 import ReportGeneration from "./components/ReportGeneration.vue";
 
 const activeNames = ref(["1"]);
+const store = useMetaStore();
+
+const fillExample = async () => {
+  await store.fillXuExampleData();
+  // Expand all panels to show the filled data
+  activeNames.value = ["1", "2", "3", "4", "5", "6", "7", "8"];
+};
 </script>
 
 <template>
@@ -17,6 +25,11 @@ const activeNames = ref(["1"]);
     <header class="app-header">
       <h1>大模型驱动的 Meta 分析工具 (Demo)</h1>
       <p class="subtitle">AI-Driven Meta-Analysis Assistant</p>
+      <div style="margin-top: 20px">
+        <el-button type="success" size="large" @click="fillExample">
+          一键填充 Xu et al. (2020) 案例数据
+        </el-button>
+      </div>
     </header>
 
     <main class="main-content">
