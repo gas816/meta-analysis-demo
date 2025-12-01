@@ -6,7 +6,8 @@
           <el-checkbox label="PubMed" />
           <el-checkbox label="EMBASE" />
           <el-checkbox label="Web of Science" />
-          <el-checkbox label="CNKI" />
+          <el-checkbox label="Scopus" />
+          <el-checkbox label="Cochrane" />
         </el-checkbox-group>
       </el-form-item>
 
