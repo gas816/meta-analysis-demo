@@ -1,19 +1,31 @@
 import { defineStore } from "pinia";
 import { reactive, ref } from "vue";
+import { recordService } from "@/api/records";
+import type { Record as LiteratureRecord } from "@/types";
 
 export interface Literature {
   id: number;
   title: string;
   authors: string;
-  year: string;
+  year: number;
   journal: string;
+  doi?: string;
+  pmid?: string;
+  abstract?: string;
+  source_database?: string;
   status: "pending" | "included" | "excluded";
   exclusionPhase?: "screening" | "eligibility";
   reason?: string;
   selected: boolean;
+  // 映射到 API 的字段
+  title_abstract_screening?: string | null;
+  title_abstract_reason?: string | null;
+  fulltext_screening?: string | null;
+  fulltext_reason?: string | null;
+  final_decision?: string | null;
 }
 
-export type ExtractionRow = Record<string, any>;
+export type ExtractionRow = { [key: string]: any };
 
 export interface ExtractionHeader {
   prop: string;
@@ -79,7 +91,7 @@ export const useMetaStore = defineStore("meta", () => {
   // 2. Search Strategy
   const search = reactive({
     databases: ["PubMed", "Web of Science"] as string[],
-    dateRange: [] as string[],
+    dateRange: ["" as string, "" as string],
     terms: [{ id: 1, logic: "AND", term: "" }] as SearchTerm[],
     searchString: "",
   });
@@ -145,103 +157,43 @@ export const useMetaStore = defineStore("meta", () => {
     }" : "${search.dateRange[1] || "End"}") [Date - Publication]`;
   };
 
-  const fetchLiteraturesFromDatabase = async () => {
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    // Mock fetching results based on search strategy
-    literatures.value = [
-      {
-        id: 1,
-        title:
-          "Association between coffee consumption and mortality: A cohort study",
-        authors: "Smith et al.",
-        year: "2020",
-        journal: "JAMA",
-        status: "pending",
+  const fetchLiteraturesFromDatabase = async (projectId: number) => {
+    try {
+      // 调用真实 API 获取文献记录
+      const records: LiteratureRecord[] = await recordService.getRecords({
+        project_id: projectId,
+        skip: 0,
+        limit: 1000,
+      });
+
+      // 将 API 返回的 LiteratureRecord 类型转换为 Literature 类型
+      literatures.value = records.map((record) => ({
+        id: record.id,
+        title: record.title,
+        authors: record.authors,
+        year: record.year,
+        journal: record.journal,
+        doi: record.doi,
+        pmid: record.pmid,
+        abstract: record.abstract,
+        source_database: record.source_database,
+        status:
+          (record.final_decision as "pending" | "included" | "excluded") ||
+          "pending",
+        exclusionPhase: undefined,
+        reason:
+          record.title_abstract_reason || record.fulltext_reason || undefined,
         selected: false,
-      },
-      {
-        id: 2,
-        title:
-          "Coffee intake and risk of cardiovascular disease: A meta-analysis",
-        authors: "Johnson et al.",
-        year: "2019",
-        journal: "BMJ",
-        status: "pending",
-        selected: false,
-      },
-      {
-        id: 3,
-        title: "Effects of caffeine on sleep quality in adults",
-        authors: "Brown et al.",
-        year: "2021",
-        journal: "Sleep",
-        status: "pending",
-        selected: false,
-      },
-      {
-        id: 4,
-        title: "Long-term effects of caffeine consumption on hypertension",
-        authors: "Davis et al.",
-        year: "2018",
-        journal: "Lancet",
-        status: "pending",
-        selected: false,
-      },
-      {
-        id: 5,
-        title: "Caffeine and cognitive decline: A systematic review",
-        authors: "Wilson et al.",
-        year: "2022",
-        journal: "Neurology",
-        status: "pending",
-        selected: false,
-      },
-      {
-        id: 6,
-        title: "Effects of caffeine on blood pressure in rats",
-        authors: "Rat et al.",
-        year: "2015",
-        journal: "Animal Science",
-        status: "pending",
-        selected: false,
-      },
-      {
-        id: 7,
-        title: "Coffee consumption and risk of type 2 diabetes",
-        authors: "Ding et al.",
-        year: "2014",
-        journal: "Diabetes Care",
-        status: "pending",
-        selected: false,
-      },
-      {
-        id: 8,
-        title: "Caffeine intake and bone mineral density",
-        authors: "Hallstrom et al.",
-        year: "2006",
-        journal: "Osteoporos Int",
-        status: "pending",
-        selected: false,
-      },
-      {
-        id: 9,
-        title: "The impact of tea and coffee on hydration status",
-        authors: "Water et al.",
-        year: "2019",
-        journal: "Nutrition",
-        status: "pending",
-        selected: false,
-      },
-      {
-        id: 10,
-        title: "Genetics of caffeine metabolism",
-        authors: "Gene et al.",
-        year: "2020",
-        journal: "Nature Genetics",
-        status: "pending",
-        selected: false,
-      },
-    ];
+        title_abstract_screening: record.title_abstract_screening,
+        title_abstract_reason: record.title_abstract_reason,
+        fulltext_screening: record.fulltext_screening,
+        fulltext_reason: record.fulltext_reason,
+        final_decision: record.final_decision,
+      }));
+    } catch (error) {
+      console.error("获取文献失败:", error);
+      throw error;
+    }
   };
 
   const autoScreenLiteratures = async () => {
@@ -265,7 +217,7 @@ export const useMetaStore = defineStore("meta", () => {
         lit.status = "excluded";
         lit.exclusionPhase = "screening";
         lit.reason = "非人类研究 (Animal study)";
-      } else if (lit.year < "2010") {
+      } else if (lit.year < 2010) {
         lit.status = "excluded";
         lit.exclusionPhase = "screening";
         lit.reason = "发表时间过早 (Pre-2010)";
@@ -388,7 +340,7 @@ export const useMetaStore = defineStore("meta", () => {
         id: Date.now() + index,
         studyId: `S${String(index + 1).padStart(3, "0")}`,
         author: lit.authors.split(" ")[0], // Simple extraction
-        year: parseInt(lit.year) || 2020,
+        year: lit.year || 2020,
         country: ["USA", "UK", "China", "Japan", "Germany"][
           Math.floor(Math.random() * 5)
         ], // Mock
@@ -489,7 +441,7 @@ export const useMetaStore = defineStore("meta", () => {
         title:
           "Sleep duration and cognitive decline in the elderly: A 10-year cohort study",
         authors: "Anderson et al.",
-        year: "2018",
+        year: 2018,
         journal: "Sleep Med",
         status: "included",
         selected: true,
@@ -499,7 +451,7 @@ export const useMetaStore = defineStore("meta", () => {
         title:
           "Insomnia and risk of dementia: a prospective population-based study",
         authors: "Baker et al.",
-        year: "2017",
+        year: 2017,
         journal: "J Gerontol",
         status: "included",
         selected: true,
@@ -509,7 +461,7 @@ export const useMetaStore = defineStore("meta", () => {
         title:
           "Sleep disturbance and Alzheimer's disease: A longitudinal analysis",
         authors: "Chen et al.",
-        year: "2016",
+        year: 2016,
         journal: "Neurology",
         status: "included",
         selected: true,
@@ -518,7 +470,7 @@ export const useMetaStore = defineStore("meta", () => {
         id: 104,
         title: "Prevalence of insomnia in patients with dementia",
         authors: "Davis et al.",
-        year: "2015",
+        year: 2015,
         journal: "J Psych",
         status: "excluded",
         exclusionPhase: "eligibility",
@@ -529,7 +481,7 @@ export const useMetaStore = defineStore("meta", () => {
         id: 105,
         title: "Effect of sleep medication on memory consolidation",
         authors: "Evans et al.",
-        year: "2019",
+        year: 2019,
         journal: "Pharmacol",
         status: "excluded",
         exclusionPhase: "screening",

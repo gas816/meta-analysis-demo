@@ -59,17 +59,28 @@
         </div>
       </el-col>
     </el-row>
+
+    <div class="action-area">
+      <el-button type="success" @click="saveDraft" :loading="saveLoading" plain>
+        <el-icon><FolderAdd /></el-icon> 暂存
+      </el-button>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, inject, type Ref } from "vue";
 import { useMetaStore } from "../stores/metaStore";
-import { Plus } from "@element-plus/icons-vue";
+import { Plus, FolderAdd } from "@element-plus/icons-vue";
+import { projectService } from "@/api/projects";
+import { ElMessage } from "element-plus";
+import type { Project } from "@/types";
 
 const store = useMetaStore();
 const newInclusion = ref("");
 const newExclusion = ref("");
+const saveLoading = ref(false);
+const currentProject = inject<Ref<Project | null>>("currentProject");
 
 const addInclusion = () => {
   if (newInclusion.value) {
@@ -92,6 +103,34 @@ const addExclusion = () => {
 const removeExclusion = (index: number) => {
   store.criteria.exclusion.splice(index, 1);
 };
+
+const saveDraft = async () => {
+  if (!currentProject?.value?.id) {
+    ElMessage.warning("请先选择项目");
+    return;
+  }
+
+  if (
+    store.criteria.inclusion.length === 0 &&
+    store.criteria.exclusion.length === 0
+  ) {
+    ElMessage.warning("请至少添加一条纳入或排除标准");
+    return;
+  }
+
+  try {
+    saveLoading.value = true;
+    await projectService.saveCriteria(currentProject.value.id, {
+      inclusion: store.criteria.inclusion,
+      exclusion: store.criteria.exclusion,
+    });
+    ElMessage.success("纳入/排除标准已暂存");
+  } catch (error: any) {
+    ElMessage.error(error.message || "暂存失败");
+  } finally {
+    saveLoading.value = false;
+  }
+};
 </script>
 
 <style scoped>
@@ -113,5 +152,9 @@ const removeExclusion = (index: number) => {
 h3 {
   margin-bottom: 15px;
   color: #303133;
+}
+.action-area {
+  margin-top: 20px;
+  text-align: center;
 }
 </style>

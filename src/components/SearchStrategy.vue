@@ -82,6 +82,14 @@
         <el-button type="primary" @click="generateString" :loading="loading">
           <el-icon><Search /></el-icon> 生成PRISMA标准检索表达式
         </el-button>
+        <el-button
+          type="success"
+          @click="saveDraft"
+          :loading="saveLoading"
+          plain
+        >
+          <el-icon><FolderAdd /></el-icon> 暂存
+        </el-button>
       </div>
 
       <div v-if="store.search.searchString" class="search-string-box">
@@ -98,17 +106,53 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, inject, type Ref } from "vue";
 import { useMetaStore } from "../stores/metaStore";
-import { Search, Delete, Plus } from "@element-plus/icons-vue";
+import { Search, Delete, Plus, FolderAdd } from "@element-plus/icons-vue";
+import { projectService } from "@/api/projects";
+import { ElMessage } from "element-plus";
+import type { Project } from "@/types";
 
 const store = useMetaStore();
 const loading = ref(false);
+const saveLoading = ref(false);
+const currentProject = inject<Ref<Project | null>>("currentProject");
 
 const generateString = async () => {
   loading.value = true;
   await store.generateSearchString();
   loading.value = false;
+};
+
+const saveDraft = async () => {
+  if (!currentProject?.value?.id) {
+    ElMessage.warning("请先选择项目");
+    return;
+  }
+
+  if (store.search.databases.length === 0) {
+    ElMessage.warning("请至少选择一个检索数据库");
+    return;
+  }
+
+  if (!store.search.searchString) {
+    ElMessage.warning("请先生成检索表达式");
+    return;
+  }
+
+  try {
+    saveLoading.value = true;
+    await projectService.saveSearchStrategy(currentProject.value.id, {
+      databases: store.search.databases,
+      query_string: store.search.searchString,
+      date_range: store.search.dateRange || null,
+    });
+    ElMessage.success("检索策略已暂存");
+  } catch (error: any) {
+    ElMessage.error(error.message || "暂存失败");
+  } finally {
+    saveLoading.value = false;
+  }
 };
 
 const addTerm = () => {
