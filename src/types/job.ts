@@ -53,6 +53,7 @@ export interface FulltextScreenParams {
 
 export interface DataExtractionParams {
   record_ids: number[]; // 需要提取数据的文献记录ID列表
+  columns: string[]; // 需要提取的列名数组
 }
 
 export interface MetaAnalysisParams {

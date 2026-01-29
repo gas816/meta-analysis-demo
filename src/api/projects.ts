@@ -53,7 +53,7 @@ class ProjectService {
    * @returns 更新后的项目
    */
   async updateProject(id: number, data: UpdateProjectDto): Promise<Project> {
-    return apiClient.put<Project>(`${this.baseURL}/${id}`, data);
+    return apiClient.patch<Project>(`${this.baseURL}/${id}`, data);
   }
 
   /**
@@ -63,6 +63,24 @@ class ProjectService {
    */
   async deleteProject(id: number): Promise<void> {
     return apiClient.delete<void>(`${this.baseURL}/${id}`);
+  }
+
+  /**
+   * 保存研究问题（暂存）
+   * @param projectId 项目 ID
+   * @param data 研究问题数据
+   * @returns 更新后的项目
+   */
+  async saveResearchQuestion(
+    projectId: number,
+    data: {
+      research_question: string;
+    }
+  ): Promise<Project> {
+    return apiClient.patch<Project>(
+      `${this.baseURL}/${projectId}/research-question`,
+      data
+    );
   }
 
   /**
@@ -79,7 +97,7 @@ class ProjectService {
       date_range?: string[] | null;
     }
   ): Promise<Project> {
-    return apiClient.put<Project>(
+    return apiClient.patch<Project>(
       `${this.baseURL}/${projectId}/search-strategy`,
       data
     );
@@ -98,7 +116,7 @@ class ProjectService {
       exclusion: string[];
     }
   ): Promise<Project> {
-    return apiClient.put<Project>(
+    return apiClient.patch<Project>(
       `${this.baseURL}/${projectId}/criteria`,
       data
     );

@@ -4,6 +4,7 @@ import type {
   CreateRecordDto,
   UpdateRecordDto,
   RecordListParams,
+  PaginationResponse,
 } from "@/types";
 
 /**
@@ -16,16 +17,56 @@ class RecordService {
   /**
    * 获取文献记录列表
    * @param params 查询参数（project_id、分页等）
-   * @returns 文献记录列表
+   * @returns 文献记录列表和分页信息
    */
-  async getRecords(params: RecordListParams): Promise<Record[]> {
+  async getRecords(
+    params: RecordListParams,
+  ): Promise<PaginationResponse<Record>> {
     const queryParams = {
       project_id: params.project_id,
       skip: params.skip ?? 0,
-      limit: params.limit ?? 100,
+      limit: params.limit ?? 10,
     };
 
-    return apiClient.get<Record[]>(`${this.baseURL}/`, { params: queryParams });
+    try {
+      // 尝试调用支持分页响应的API
+      const response = await apiClient.get<any>(`${this.baseURL}/`, {
+        params: queryParams,
+      });
+
+      // 检查响应是否为分页格式
+      if (response && typeof response === "object" && "items" in response) {
+        return response as PaginationResponse<Record>;
+      }
+
+      // 如果响应是数组格式，转换为分页格式
+      if (Array.isArray(response)) {
+        return {
+          items: response as Record[],
+          total: response.length,
+          skip: queryParams.skip,
+          limit: queryParams.limit,
+        };
+      }
+
+      // 如果响应格式不正确，返回空结果
+      console.warn("API 返回的数据格式不正确:", response);
+      return {
+        items: [],
+        total: 0,
+        skip: queryParams.skip,
+        limit: queryParams.limit,
+      };
+    } catch (error) {
+      console.error("获取文献记录失败:", error);
+      // 返回空结果而不是抛出错误
+      return {
+        items: [],
+        total: 0,
+        skip: queryParams.skip,
+        limit: queryParams.limit,
+      };
+    }
   }
 
   /**
@@ -83,6 +124,24 @@ class RecordService {
   async deleteRecordsBatch(ids: number[]): Promise<{ detail: string }[]> {
     const promises = ids.map((id) => this.deleteRecord(id));
     return Promise.all(promises);
+  }
+
+  /**
+   * 上传文献PDF文件
+   * @param id 文献记录 ID
+   * @param formData 包含PDF文件的FormData
+   * @returns 上传后的文献记录信息
+   */
+  async uploadPdf(id: number, formData: FormData): Promise<Record> {
+    return apiClient.post<Record>(
+      `${this.baseURL}/${id}/upload-pdf`,
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      },
+    );
   }
 }
 

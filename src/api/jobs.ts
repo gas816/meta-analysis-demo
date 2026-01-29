@@ -45,6 +45,20 @@ class JobService {
   async cancelJob(id: number): Promise<Job> {
     return apiClient.post<Job>(`${this.baseURL}/${id}/cancel`);
   }
+
+  /**
+   * 获取报告文件内容
+   * @param filename 报告文件名
+   * @returns 报告的 Markdown 内容
+   */
+  async getReport(filename: string): Promise<string> {
+    const response = await apiClient
+      .getAxiosInstance()
+      .get<string>(`/api/reports/${filename}`, {
+        responseType: "text",
+      });
+    return response.data;
+  }
 }
 
 // 导出单例实例

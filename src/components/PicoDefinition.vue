@@ -39,6 +39,15 @@
       <el-button type="primary" @click="generateQuestion" :loading="loading">
         <el-icon><MagicStick /></el-icon> 生成问题描述
       </el-button>
+      <el-button
+        type="success"
+        @click="saveDraft"
+        :loading="saveLoading"
+        :disabled="!store.pico.question"
+        plain
+      >
+        <el-icon><FolderAdd /></el-icon> 暂存
+      </el-button>
     </div>
 
     <el-alert
@@ -53,17 +62,46 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, inject, type Ref } from "vue";
 import { useMetaStore } from "../stores/metaStore";
-import { MagicStick } from "@element-plus/icons-vue";
+import { MagicStick, FolderAdd } from "@element-plus/icons-vue";
+import { projectService } from "@/api/projects";
+import { ElMessage } from "element-plus";
+import type { Project } from "@/types";
 
 const store = useMetaStore();
 const loading = ref(false);
+const saveLoading = ref(false);
+const currentProject = inject<Ref<Project | null>>("currentProject");
 
 const generateQuestion = async () => {
   loading.value = true;
   await store.generatePicoQuestion();
   loading.value = false;
+};
+
+const saveDraft = async () => {
+  if (!currentProject?.value?.id) {
+    ElMessage.warning("请先选择项目");
+    return;
+  }
+
+  if (!store.pico.question) {
+    ElMessage.warning("请先生成问题描述");
+    return;
+  }
+
+  try {
+    saveLoading.value = true;
+    await projectService.saveResearchQuestion(currentProject.value.id, {
+      research_question: store.pico.question,
+    });
+    ElMessage.success("研究问题已暂存");
+  } catch (error: any) {
+    ElMessage.error(error.message || "暂存失败");
+  } finally {
+    saveLoading.value = false;
+  }
 };
 </script>
 

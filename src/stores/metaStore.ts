@@ -13,10 +13,13 @@ export interface Literature {
   pmid?: string;
   abstract?: string;
   source_database?: string;
+  project_id?: number;
   status: "pending" | "included" | "excluded";
   exclusionPhase?: "screening" | "eligibility";
   reason?: string;
   selected: boolean;
+  fulltext_available?: boolean;
+  pdf_path?: string | null;
   // 映射到 API 的字段
   title_abstract_screening?: string | null;
   title_abstract_reason?: string | null;
@@ -79,6 +82,9 @@ export interface GradeProfile {
 }
 
 export const useMetaStore = defineStore("meta", () => {
+  // 0. Current Project
+  const currentProjectId = ref<number | null>(null);
+
   // 1. PICO
   const pico = reactive({
     population: "",
@@ -160,14 +166,23 @@ export const useMetaStore = defineStore("meta", () => {
   const fetchLiteraturesFromDatabase = async (projectId: number) => {
     try {
       // 调用真实 API 获取文献记录
-      const records: LiteratureRecord[] = await recordService.getRecords({
+      const response = await recordService.getRecords({
         project_id: projectId,
         skip: 0,
         limit: 1000,
       });
 
+      // 验证响应数据结构
+      if (!response || !response.items || !Array.isArray(response.items)) {
+        console.warn("API 返回的数据结构不正确:", response);
+        literatures.value = [];
+        return;
+      }
+
+      const records: LiteratureRecord[] = response.items;
+
       // 将 API 返回的 LiteratureRecord 类型转换为 Literature 类型
-      literatures.value = records.map((record) => ({
+      literatures.value = records?.map((record) => ({
         id: record.id,
         title: record.title,
         authors: record.authors,
@@ -177,6 +192,7 @@ export const useMetaStore = defineStore("meta", () => {
         pmid: record.pmid,
         abstract: record.abstract,
         source_database: record.source_database,
+        project_id: record.project_id,
         status:
           (record.final_decision as "pending" | "included" | "excluded") ||
           "pending",
@@ -184,6 +200,8 @@ export const useMetaStore = defineStore("meta", () => {
         reason:
           record.title_abstract_reason || record.fulltext_reason || undefined,
         selected: false,
+        fulltext_available: record.fulltext_available || false,
+        pdf_path: record.pdf_path || null,
         title_abstract_screening: record.title_abstract_screening,
         title_abstract_reason: record.title_abstract_reason,
         fulltext_screening: record.fulltext_screening,
@@ -192,7 +210,8 @@ export const useMetaStore = defineStore("meta", () => {
       }));
     } catch (error) {
       console.error("获取文献失败:", error);
-      throw error;
+      literatures.value = [];
+      // 不再抛出错误，让调用方自行处理
     }
   };
 
@@ -332,7 +351,7 @@ export const useMetaStore = defineStore("meta", () => {
 
     // Filter included literatures
     const includedLits = literatures.value.filter(
-      (l) => l.status === "included"
+      (l) => l.status === "included",
     );
 
     includedLits.forEach((lit, index) => {
@@ -366,7 +385,7 @@ export const useMetaStore = defineStore("meta", () => {
 
   const removeExtractionHeader = (prop: string) => {
     extractionHeaders.value = extractionHeaders.value.filter(
-      (h) => h.prop !== prop
+      (h) => h.prop !== prop,
     );
   };
 
@@ -377,31 +396,120 @@ export const useMetaStore = defineStore("meta", () => {
   };
 
   const generateReport = async () => {
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    reportContent.value = `
-# Meta分析报告
+    if (!currentProjectId.value) {
+      throw new Error("请先选择项目");
+    }
 
-## 1. 背景
-本研究基于PICO框架构建，旨在探究 **${pico.intervention}** 对 **${
-      pico.population
-    }** 的影响。
+    // 导入 jobService
+    const { jobService } = await import("@/api/jobs");
 
-## 2. 方法
-检索了 ${search.databases.join(
-      ", "
-    )} 数据库。纳入标准包括：${criteria.inclusion.join("; ")}。
+    // 创建报告生成任务
+    const job = await jobService.createJob({
+      project_id: currentProjectId.value,
+      job_type: "generate_report",
+      parameters: JSON.stringify({
+        report_type: "full",
+        include_sections: ["background", "methods", "results", "conclusion"],
+      }),
+    });
 
-## 3. 结果
-共纳入 ${
-      literatures.value.filter((l) => l.status === "included").length
-    } 篇文献。
-异质性检验显示 $I^2 = ${analysis.heterogeneity.i2}%$。
+    // 轮询任务状态
+    const pollInterval = 1000; // 1秒
+    const maxAttempts = 300; // 最多5分钟
+    let attempts = 0;
 
-## 4. 结论
-根据 GRADE 评级，主要结局指标的证据质量为 **${
-      grade.profiles[0]?.overallCertainty || "未评估"
-    }**。
-    `;
+    while (attempts < maxAttempts) {
+      await new Promise((resolve) => setTimeout(resolve, pollInterval));
+      const updatedJob = await jobService.getJob(job.id);
+
+      if (updatedJob.status === "completed") {
+        // 解析 result_data 获取报告文件名
+        if (updatedJob.result_data) {
+          const resultData = JSON.parse(updatedJob.result_data);
+          const reportFilename = resultData.report_filename;
+
+          // 获取报告内容
+          const markdownContent = await jobService.getReport(reportFilename);
+          reportContent.value = markdownContent;
+        }
+        break;
+      } else if (updatedJob.status === "failed") {
+        throw new Error(updatedJob.error_message || "报告生成失败");
+      } else if (updatedJob.status === "cancelled") {
+        throw new Error("任务已取消");
+      }
+
+      attempts++;
+    }
+
+    if (attempts >= maxAttempts) {
+      throw new Error("报告生成超时");
+    }
+  };
+
+  /**
+   * 从项目数据加载到 store
+   * @param project 项目详情数据
+   */
+  const loadProjectData = (project: any) => {
+    // 设置当前项目ID
+    currentProjectId.value = project.id;
+
+    // 1. PICO - 从 research_question 解析
+    if (project.research_question) {
+      pico.question = project.research_question;
+
+      // 尝试从问题中解析各部分（格式：本研究旨在探讨 [干预] 对 [人群] 的 [结局] 风险的影响，并与 [对照] 进行比较。）
+      const match = project.research_question.match(
+        /探讨\s+(.+?)\s+对\s+(.+?)\s+的\s+(.+?)\s+风险的影响，并与\s+(.+?)\s+进行比较/,
+      );
+      if (match) {
+        pico.intervention = match[1].trim();
+        pico.population = match[2].trim();
+        pico.outcome = match[3].trim();
+        pico.comparison = match[4].trim();
+      }
+    }
+
+    // 2. Search Strategy
+    if (project.search_keywords) {
+      try {
+        const keywords = JSON.parse(project.search_keywords);
+        if (keywords.query) {
+          search.searchString = keywords.query;
+        }
+        if (keywords.date_range && Array.isArray(keywords.date_range)) {
+          search.dateRange = keywords.date_range as [string, string];
+        }
+      } catch (e) {
+        console.error("解析 search_keywords 失败:", e);
+      }
+    }
+
+    if (project.search_databases) {
+      search.databases = project.search_databases
+        .split(",")
+        .map((db: string) => db.trim());
+    }
+
+    // 3. Criteria
+    if (project.inclusion_criteria) {
+      try {
+        const criteria_data = JSON.parse(project.inclusion_criteria);
+        criteria.inclusion = Array.isArray(criteria_data) ? criteria_data : [];
+      } catch (e) {
+        console.error("解析 inclusion_criteria 失败:", e);
+      }
+    }
+
+    if (project.exclusion_criteria) {
+      try {
+        const criteria_data = JSON.parse(project.exclusion_criteria);
+        criteria.exclusion = Array.isArray(criteria_data) ? criteria_data : [];
+      } catch (e) {
+        console.error("解析 exclusion_criteria 失败:", e);
+      }
+    }
   };
 
   const fillXuExampleData = async () => {
@@ -445,6 +553,7 @@ export const useMetaStore = defineStore("meta", () => {
         journal: "Sleep Med",
         status: "included",
         selected: true,
+        fulltext_available: true,
       },
       {
         id: 102,
@@ -455,6 +564,7 @@ export const useMetaStore = defineStore("meta", () => {
         journal: "J Gerontol",
         status: "included",
         selected: true,
+        fulltext_available: false,
       },
       {
         id: 103,
@@ -465,6 +575,7 @@ export const useMetaStore = defineStore("meta", () => {
         journal: "Neurology",
         status: "included",
         selected: true,
+        fulltext_available: true,
       },
       {
         id: 104,
@@ -476,6 +587,7 @@ export const useMetaStore = defineStore("meta", () => {
         exclusionPhase: "eligibility",
         reason: "横断面研究 (Cross-sectional)",
         selected: false,
+        fulltext_available: false,
       },
       {
         id: 105,
@@ -487,6 +599,7 @@ export const useMetaStore = defineStore("meta", () => {
         exclusionPhase: "screening",
         reason: "干预措施不符 (Intervention mismatch)",
         selected: false,
+        fulltext_available: false,
       },
     ];
 
@@ -609,6 +722,7 @@ export const useMetaStore = defineStore("meta", () => {
   };
 
   return {
+    currentProjectId,
     pico,
     search,
     criteria,
@@ -628,6 +742,7 @@ export const useMetaStore = defineStore("meta", () => {
     removeExtractionHeader,
     runMetaAnalysis,
     generateReport,
+    loadProjectData,
     fillXuExampleData,
   };
 });
