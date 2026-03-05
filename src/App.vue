@@ -31,7 +31,7 @@ const steps = [
   { title: "文献爬取与筛选", description: "Literature Screening" },
   { title: "数据提取模板", description: "Data Extraction" },
   { title: "分析设置与图表", description: "Analysis & Charts" },
-  // { title: "GRADE评价", description: "Evidence Quality" },
+  { title: "GRADE评价", description: "Evidence Quality" },
   { title: "自动生成报告", description: "Report Generation" },
 ];
 
@@ -150,8 +150,8 @@ provide("currentProject", currentProject);
           <LiteratureScreening v-else-if="currentStep === 3" />
           <DataExtraction v-else-if="currentStep === 4" />
           <AnalysisCharts v-else-if="currentStep === 5" />
-          <!-- <GradeEvaluation v-else-if="currentStep === 6" /> -->
-          <ReportGeneration v-else-if="currentStep === 6" />
+          <GradeEvaluation v-else-if="currentStep === 6" />
+          <ReportGeneration v-else-if="currentStep === 7" />
         </div>
 
         <!-- 导航按钮 -->
