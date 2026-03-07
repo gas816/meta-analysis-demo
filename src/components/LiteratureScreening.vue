@@ -473,12 +473,18 @@ const fetchDocs = async () => {
     return;
   }
 
+  if (!currentProject.value?.search_keywords) {
+    ElMessage.warning(
+      "请先在步骤 2（检索策略构建）中生成检索式并点击「暂存」后再执行检索",
+    );
+    return;
+  }
+
   fetching.value = true;
 
   try {
     // 获取检索策略（从项目配置中）
-    const searchStrategy =
-      currentProject.value?.search_keywords || "dementia AND sleep";
+    const searchStrategy = currentProject.value.search_keywords;
     // 从项目配置中获取数据库列表
     const databases = currentProject.value?.search_databases
       ? currentProject.value.search_databases

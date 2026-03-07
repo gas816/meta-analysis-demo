@@ -142,11 +142,16 @@ const saveDraft = async () => {
 
   try {
     saveLoading.value = true;
-    await projectService.saveSearchStrategy(currentProject.value.id, {
-      databases: store.search.databases,
-      query_string: store.search.searchString,
-      date_range: store.search.dateRange || null,
-    });
+    const updatedProject = await projectService.saveSearchStrategy(
+      currentProject.value.id,
+      {
+        databases: store.search.databases,
+        query_string: store.search.searchString,
+        date_range: store.search.dateRange || null,
+      },
+    );
+    // 用后端返回的最新数据刷新 currentProject，确保后续步骤能读取到正确的检索策略
+    currentProject.value = updatedProject;
     ElMessage.success("检索策略已暂存");
   } catch (error: any) {
     ElMessage.error(error.message || "暂存失败");

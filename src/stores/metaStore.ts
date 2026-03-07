@@ -455,6 +455,34 @@ export const useMetaStore = defineStore("meta", () => {
     // 设置当前项目ID
     currentProjectId.value = project.id;
 
+    // 先重置所有状态，防止切换项目时残留旧数据
+    pico.population = "";
+    pico.intervention = "";
+    pico.comparison = "";
+    pico.outcome = "";
+    pico.question = "";
+
+    search.databases = ["PubMed", "Scopus"];
+    search.dateRange = ["", ""];
+    search.terms = [{ id: 1, logic: "AND", term: "" }];
+    search.searchString = "";
+
+    criteria.inclusion = [];
+    criteria.exclusion = [];
+
+    literatures.value = [];
+    extractionHeaders.value = [];
+    extractionData.value = [];
+
+    analysis.effectModel = "OR";
+    analysis.heterogeneity = { i2: 0, q: 0, p: 0 };
+    analysis.isAnalyzed = false;
+
+    grade.tool = "NOS";
+    grade.profiles = [];
+
+    reportContent.value = "";
+
     // 1. PICO - 从 research_question 解析
     if (project.research_question) {
       pico.question = project.research_question;
