@@ -16,7 +16,7 @@ interface ApiClientConfig {
  * 默认配置
  */
 const DEFAULT_CONFIG: ApiClientConfig = {
-  baseURL: "http://localhost:8000",
+  baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:8000",
   timeout: 30000,
   headers: {
     "Content-Type": "application/json",
@@ -74,7 +74,7 @@ class ApiClient {
       (error) => {
         console.error("[API Request Error]", error);
         return Promise.reject(error);
-      }
+      },
     );
   }
 
@@ -90,7 +90,7 @@ class ApiClient {
       (error: AxiosError) => {
         // 统一错误处理
         return this.handleError(error);
-      }
+      },
     );
   }
 
@@ -172,7 +172,7 @@ class ApiClient {
   public post<T = any>(
     url: string,
     data?: any,
-    config?: AxiosRequestConfig
+    config?: AxiosRequestConfig,
   ): Promise<T> {
     return this.instance
       .post<T, AxiosResponse<T>>(url, data, config)
@@ -185,7 +185,7 @@ class ApiClient {
   public put<T = any>(
     url: string,
     data?: any,
-    config?: AxiosRequestConfig
+    config?: AxiosRequestConfig,
   ): Promise<T> {
     return this.instance
       .put<T, AxiosResponse<T>>(url, data, config)
@@ -198,7 +198,7 @@ class ApiClient {
   public patch<T = any>(
     url: string,
     data?: any,
-    config?: AxiosRequestConfig
+    config?: AxiosRequestConfig,
   ): Promise<T> {
     return this.instance
       .patch<T, AxiosResponse<T>>(url, data, config)
